@@ -1,9 +1,15 @@
 import time
 import psutil
 import subprocess
+import os
+import threading
 
 CMD_MOUNT = "sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y"
 CMD_UMOUNT= "modprobe -r g_mass_storage"
+
+def pararProceso():
+	os.system("sudo systemctl stop smbd")
+
 
 ##Buscamos el proceso hasta que aparezca o keyboardInterrupt.
 def buscarProceso():
@@ -30,6 +36,31 @@ def monitorearProceso(p_USB,p_SMB):
 		if p_USB.io_counters().write_count!=wriAnt_USB:
 			#Si se da este caso significa que el master esta escribiendo, por lo tanto, SAMBA solo de escritura.
 			print("HEMOS DETECTADO ESCRITURA POR USB")
+			#Primero paramos el servidor samba o lo ponemos en modo read only para evitar problemas de corrupcion.
+			#x = threading.Thread(target=pararProceso)
+			#x.start()
+			os.system("sudo systemctl stop smbd")
+			print("Paramos samba")
+			#out = subprocess.run(['service', 'smbd', 'stop'],stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+			#time.sleep(1)
+			#Primero determinar cuando ha terminado de escribir:
+			print("Comprobacion que esta escrbiendo"+str(p_USB.io_counters().write_count)+" "+str(wriAnt_USB))
+			while p_USB.io_counters().write_count!=wriAnt_USB:
+				print("Escribiendo...")
+				wriAnt_USB=p_USB.io_counters().write_count
+				time.sleep(1) #Comprobamos cada segundo si ha terminado.
+			print("Ha parado de escrbir")
+			os.system("sudo modprobe -r g_mass_storage") #Cuando ya ha terminado desconectamos y volvemos a conectar el usb
+			print("Usb desconectado")
+			os.system("sudo umount /mnt/usb_share")
+			print("Desmontaje realizado")
+			os.system("sudo mount /mnt/usb_share")
+			print("Montaje realizado")
+			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y") 
+			print("Conexion USB realizada")
+			os.system("sudo systemctl start smbd")
+			print("Samba en marcha")
+			p_USB,p_SMB=buscarProceso()
 		print(p_SMB.io_counters())
 		if p_SMB.io_counters().write_count!=wriAnt_SMB:
 		#if process.stdout.readline() is not None:
