@@ -3,6 +3,7 @@ import psutil
 import subprocess
 import os
 import threading
+import pyionitify
 
 CMD_MOUNT = "sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y"
 CMD_UMOUNT= "modprobe -r g_mass_storage"
@@ -28,6 +29,13 @@ def buscarProceso():
 
 
 def monitorearProceso(p_USB,p_SMB):
+	#Deteccion de cambios en samba.
+	handler = ModHandler()
+	wm = pyinotify.WatchManager()
+	notifier = pyinotify.Notifier(wm, handler)
+	wdd = wm.add_watch("/mnt/usb_share", pyinotify.ALL_EVENTS)
+	notifier.loop()
+	
 	wriAnt_USB=p_USB.io_counters().write_count
 	wriAnt_SMB=p_SMB.io_counters().write_count
 	#process=subprocess.Popen(['fswatch','-r','--event=Updated','/mnt/usb_share'],stdout=subprocess.PIPE,universal_newlines=True)
@@ -42,7 +50,6 @@ def monitorearProceso(p_USB,p_SMB):
 			os.system("sudo systemctl stop smbd")
 			print("Paramos samba")
 			#out = subprocess.run(['service', 'smbd', 'stop'],stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
-			#time.sleep(1)
 			#Primero determinar cuando ha terminado de escribir:
 			print("Comprobacion que esta escrbiendo"+str(p_USB.io_counters().write_count)+" "+str(wriAnt_USB))
 			while p_USB.io_counters().write_count!=wriAnt_USB:
@@ -61,12 +68,17 @@ def monitorearProceso(p_USB,p_SMB):
 			os.system("sudo systemctl start smbd")
 			print("Samba en marcha")
 			p_USB,p_SMB=buscarProceso()
-		print(p_SMB.io_counters())
+		#print(p_SMB.io_counters())
+		#Podemos detectar los cambios de samba con un notificador de deteccion de ficheros. en linux es ionify, pero hay una libreria que hace lo mismo: pionify.
 		if p_SMB.io_counters().write_count!=wriAnt_SMB:
-		#if process.stdout.readline() is not None:
 			#Si se da este caso significa que el esclavo esta escribiendo, por lo tanto, USB solo de escritura.
-			print("HEMOS DETECTADO ESCRITURA POR SAMABA")
-			#print(process.stdout.readline())
+			print("HEMOS DETECTADO ESCRITURA POR SAMBA")
+			os.system("sudo modprobe -r g_mass_storage") #Desconectamos el USB
+			print("USB desconectado")
+			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=1 removable=y") 
+			print("USB conectado como solo READ")
+			#Comprobar cuanto tiempo esta escribiendo
+			
 		wriAnt_USB=p_USB.io_counters().write_count
 		wriAnt_SMB=p_SMB.io_counters().write_count
 
