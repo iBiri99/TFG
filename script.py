@@ -8,6 +8,13 @@ import pyionitify
 CMD_MOUNT = "sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y"
 CMD_UMOUNT= "modprobe -r g_mass_storage"
 
+class ModHandler(pyinotify.ProcessEvent):
+    # evt has useful properties, including pathname
+    def process_IN_CLOSE_WRITE(self, evt):
+            print("HA HECHO ALGO")
+
+
+
 def pararProceso():
 	os.system("sudo systemctl stop smbd")
 
