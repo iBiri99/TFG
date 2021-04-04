@@ -28,7 +28,7 @@ class ModHandler(pyinotify.ProcessEvent):
 		global flag
 		print("Se ha cerrado")
 		flag=3
-		
+
 
 def ControlSamba():
 	handler = ModHandler()
@@ -63,8 +63,6 @@ def monitorearProceso(p_USB,p_SMB):
 	x = threading.Thread(target=ControlSamba)
 	x.start()
 	global flag
-	global flagSMBterminado
-	modoRead=False
 	wriAnt_USB=p_USB.io_counters().write_count
 	print("Empezamos a monitorear")
 	while True:
