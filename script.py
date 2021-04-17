@@ -4,6 +4,7 @@ import subprocess
 import os
 import threading
 import pyinotify
+import configparser
 
 CMD_MOUNT = "sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y"
 CMD_UMOUNT= "modprobe -r g_mass_storage"
@@ -29,6 +30,28 @@ class ModHandler(pyinotify.ProcessEvent):
 		print("Se ha cerrado")
 		flag=3
 
+#Si el flag es true, poner en modo solo lectura
+def cambioSamba(flag):
+	global config
+	config=configparser.ConfigParser()
+	config.read('/etc/samba/smb.conf')
+	if flag is True:
+		config['share']={"comment" : "Raspberry pi prueba",
+		"path" : "/mnt/usb_share",
+		"browsable" : "yes",
+		"guest ok" : "yes",
+		"read only" : "yes",
+		"create mask" : "0700"}
+	else:
+		config['share']={"comment" : "Raspberry pi prueba",
+		"path" : "/mnt/usb_share",
+		"browsable" : "yes",
+		"guest ok" : "yes",
+		"read only" : "no",
+		"create mask" : "0700"}
+	with open('/etc/samba/smb.conf', 'w') as configfile:
+		config.write(configfile)
+	os.system("smbcontrol smbd reload-config")
 
 def ControlSamba():
 	handler = ModHandler()
@@ -40,8 +63,10 @@ def ControlSamba():
 
 ##Buscamos el proceso hasta que aparezca o keyboardInterrupt.
 def buscarProceso():
+	cambioSamba(False) #Ponemos que inicie siempre en modo escritura
 	flagUSB=False #Flag que señala si se ha encontrado el proceso del USB
 	flagSMB=False #Flag que señala si se ha encontrado el proceso de SAMBA
+	os.system(CMD_UMOUNT)
 	while True:
 		for proc in psutil.process_iter():
 			if proc.name() == "file-storage":
@@ -54,6 +79,7 @@ def buscarProceso():
 				return procUSB,procSMB
 		if not flagUSB:
 			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y") 
+			time.sleep(2) #Tiempo para que se monte correctamente.
 		if not flagSMB:
 			os.system("sudo systemctl start smbd")
 
@@ -63,32 +89,49 @@ def monitorearProceso(p_USB,p_SMB):
 	x = threading.Thread(target=ControlSamba)
 	x.start()
 	global flag
+	modoRead=False
 	wriAnt_USB=p_USB.io_counters().write_count
 	print("Empezamos a monitorear")
 	while True:
+		print(p_USB.io_counters())
+		time.sleep(1)
 		if p_USB.io_counters().write_count!=wriAnt_USB:
-			#Si se da este caso significa que el master esta escribiendo, por lo tanto, SAMBA solo de escritura.
-			print("HEMOS DETECTADO ESCRITURA POR USB")
-			os.system("sudo systemctl stop smbd")
-			print("Paramos samba")
-			#Primero determinar cuando ha terminado de escribir:
-			print("Comprobacion que esta escrbiendo"+str(p_USB.io_counters().write_count)+" "+str(wriAnt_USB))
-			while p_USB.io_counters().write_count!=wriAnt_USB:
-				print("Escribiendo...")
-				wriAnt_USB=p_USB.io_counters().write_count
-				time.sleep(1) #Comprobamos cada segundo si ha terminado.
-			print("Ha parado de escrbir")
-			os.system("sudo modprobe -r g_mass_storage") #Cuando ya ha terminado desconectamos y volvemos a conectar el usb
-			print("Usb desconectado")
-			os.system("sudo umount /mnt/usb_share")
-			print("Desmontaje realizado")
-			os.system("sudo mount /mnt/usb_share")
-			print("Montaje realizado")
-			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y") 
-			print("Conexion USB realizada")
-			os.system("sudo systemctl start smbd")
-			print("Samba en marcha")
-			p_USB,p_SMB=buscarProceso()
+			if not modoRead:
+				aux=p_USB.io_counters().write_count-wriAnt_USB
+				rec=p_USB.io_counters().write_count
+				#Si se da este caso significa que el master esta escribiendo, por lo tanto, SAMBA solo de escritura.
+				escritGorda=False
+				if aux>2:
+					print("HEMOS DETECTADO ESCRITURA POR USB")
+					os.system("sudo systemctl stop smbd")
+					print("Paramos samba")
+				#Primero determinar cuando ha terminado de escribir:
+				print("Comprobacion que esta escrbiendo"+str(p_USB.io_counters().write_count)+" "+str(wriAnt_USB))
+				cont=0
+				while p_USB.io_counters().write_count!=wriAnt_USB:
+					print("Escribiendo...")
+					wriAnt_USB=p_USB.io_counters().write_count
+					cont+=1
+					if cont>2:
+						escritGorda=True
+					time.sleep(1) #Comprobamos cada segundo si ha terminado.
+				print("Ha parado de escrbir")
+				#Solo conectamos y desconectamos cuando la escritura ha sido lo suficiente grande:
+				#print("El valor de aux antes es: "+str(aux))
+				#aux=rec-wriAnt_USB
+				print("El valor de aux es: "+str(aux)+" y el de rec: "+str(rec))
+				if aux>2 or escritGorda:
+					os.system("sudo modprobe -r g_mass_storage") #Cuando ya ha terminado desconectamos y volvemos a conectar el usb
+					print("Usb desconectado")
+					os.system("sudo umount /mnt/usb_share")
+					print("Desmontaje realizado")
+					os.system("sudo mount /mnt/usb_share")
+					print("Montaje realizado")
+					os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y") 
+					print("Conexion USB realizada")
+					os.system("sudo systemctl start smbd")
+					print("Samba en marcha")
+				p_USB,p_SMB=buscarProceso()
 		#Podemos detectar los cambios de samba con un notificador de deteccion de ficheros. en linux es ionify, pero hay una libreria que hace lo mismo: pionify.
 		if flag == 1:
 			#Desconectamos y conectamos el USB
@@ -103,11 +146,13 @@ def monitorearProceso(p_USB,p_SMB):
 			print("USB desconectado")
 			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=1 removable=y") 
 			print("USB conectado como solo READ")
+			modoRead=True
 			flag=0
 		elif flag == 3:
 			#Ya se ha cerrado el archivo, por lo que ya podemos volver a conectar con write.
 			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y") 
 			print("USB conectado como READ/WRITE")
+			modoRead=False
 			flag=0
 		if flag!=0:
 			p_USB,p_SMB=buscarProceso()
