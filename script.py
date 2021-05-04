@@ -83,8 +83,8 @@ def buscarProceso():
 				return procUSB,procSMB
 		if flagUSB is False:
 			os.system(CMD_MOUNT)
-			print("Se ha montado el USB")
 			time.sleep(2) #Tiempo para que se monte correctamente.
+			print("Se ha montado el USB")
 		if flagSMB is False:
 			os.system("sudo systemctl start smbd")
 
@@ -95,8 +95,9 @@ def monitorearProceso(p_USB,p_SMB):
 	x.start()
 	global flag
 	global tiempoMontado
+	#os.system(CMD_MOUNT)
 	tiempoMontado=time.time()
-	tiempoDesdeCero=0
+	tiempoDesdeCero=time.time()
 	start=time.time()
 	modoRead=False
 	escrit=False
@@ -104,14 +105,15 @@ def monitorearProceso(p_USB,p_SMB):
 	print("Empezamos a monitorear")
 	tiemtotal=0
 	while True:
-		#print(p_USB.io_counters())
+		print(p_USB.io_counters())
 		time.sleep(1)
 		if p_USB.io_counters().write_count==0:
 			tiempoDesdeCero=time.time()
-		if p_USB.io_counters().write_count!=wriAnt_USB:
+		if p_USB.io_counters().write_count!=wriAnt_USB and wriAnt_USB>20:
 			start = time.time() #Vamos a coger el tiempo desde la ultima deteccion de cambio de escritura.
 			print("Escritura detectada")
 			tiempomon=int(tiempoMontado)-int(start)
+			tiempoDesdeCero=time.time()
 			if not modoRead:
 				#Si se da este caso significa que el master esta escribiendo, por lo tanto, SAMBA solo de escritura.
 				cambioSamba(True)
@@ -124,27 +126,25 @@ def monitorearProceso(p_USB,p_SMB):
 					rec=p_USB.io_counters().write_count
 					print("Escribiendo...")
 					time.sleep(2) #Comprobamos cada segundo si ha terminado.
-				print("Ha parado de escrbir")
-				#Solo conectamos y desconectamos cuando la escritura ha sido lo suficiente grande:
 				print("Proceso USB: "+p_USB.name())
 		elif escrit is True: #Vamos a mirar si el temporizador lleva mas de x segundos
 			global tiempoEspera
 			print("El tiempo de inicio es: "+str(start)+" tiempo de espera "+str(tiempoEspera))
 			tiem=int(time.time())-int(start)
 			tiem2=int(time.time())-int(tiempoDesdeCero)
-			if tiem2<tiempoEspera:
-				escrit=False
-				cambioSamba(False)
-			print("Tiempo entre empezar: "+str(tiem)+" tiempo desde el 0 "+str(tiem2))
-			if tiem>tiempoEspera and tiem2>tiempoEspera: #Ya ha terminado de escribir del todo, volvemos a poner todo como debe.
+			#if tiem2<tiempoEspera:
+			#	escrit=False
+			#	cambioSamba(False)
+			print("Tiempo entre empezar: "+str(tiem)+" tiempo desde el principio: "+str(tiem2))
+			if tiem>tiempoEspera and tiem2>tiempoEspera: #Ya ha terminado de escribir del todo,y hemos esperado el tiempo, volvemos a poner todo como debe.
 				print("Ha entrado aquiiiiiiiiiiiiiiiiiiiiii")
-				os.system(CMD_UMOUNT)
+				#os.system(CMD_UMOUNT)
 				print("Usb desconectado")
 				os.system("sudo umount /mnt/usb_share")
 				print("Desmontaje realizado")
 				os.system("sudo mount /mnt/usb_share")
 				print("Montaje realizado")
-				os.system(CMD_UMOUNT) #Desconectamos el USB
+				#os.system(CMD_MOUNT) #Conectamos el USB
 				if p_USB is None:
 					p_USB,p_SMB=buscarProceso()
 				time.sleep(2)
@@ -157,7 +157,9 @@ def monitorearProceso(p_USB,p_SMB):
 			#Desconectamos y conectamos el USB
 			print("HEMOS DETECTADO UNA MODIFICACION POR SAMBA")
 			os.system(CMD_UMOUNT) #Desconectamos el USB
-			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y") 
+			print("USB DESMONTADO")
+			os.system(CMD_MOUNT) #Conectamos para que se actualicen los datos. 
+			print("USB MONTADO")
 			flag=0
 		elif flag == 2:
 			#Se ha creado un nuevo archivo, hay que esperar hasta que se cierra, mientras, USB solo en read.
@@ -170,7 +172,9 @@ def monitorearProceso(p_USB,p_SMB):
 			flag=0
 		elif flag == 3:
 			#Ya se ha cerrado el archivo, por lo que ya podemos volver a conectar con write.
-			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y") 
+			os.system(CMD_UMOUNT) #Desconectamos el USB
+			print("USB DESMONTADO")
+			os.system(CMD_MOUNT) 
 			print("USB conectado como READ/WRITE")
 			tiempoMontado=time.time()
 			modoRead=False
@@ -193,6 +197,7 @@ if __name__ == "__main__":
 		#p.io_counter().write_count ## Podemos ver el numero de escrituras que tiene.
 		#time.sleep(1)
 	except KeyboardInterrupt:
+		os.system(CMD_UMOUNT)
 		exit()
 	except Exception as ex:
 		print(ex)
