@@ -64,7 +64,7 @@ def ControlSamba():
 
 
 ##Buscamos el proceso hasta que aparezca o keyboardInterrupt.
-def buscarProceso():
+def buscarProceso(str):
 	cambioSamba(False) #Ponemos que inicie siempre en modo escritura
 	flagUSB=False #Flag que señala si se ha encontrado el proceso del USB
 	flagSMB=False #Flag que señala si se ha encontrado el proceso de SAMBA
@@ -82,7 +82,7 @@ def buscarProceso():
 			if flagUSB and flagSMB:
 				return procUSB,procSMB
 		if flagUSB is False:
-			os.system(CMD_MOUNT)
+			os.system(str) #Metemos por parametro el comando a ejecutar (Por si es lectura o lectura/escritura)
 			time.sleep(2) #Tiempo para que se monte correctamente.
 			print("Se ha montado el USB")
 		if flagSMB is False:
@@ -97,7 +97,7 @@ def monitorearProceso(p_USB,p_SMB):
 	global tiempoMontado
 	#os.system(CMD_MOUNT)
 	tiempoMontado=time.time()
-	tiempoDesdeCero=time.time()
+	tiempoDesdeCamb=time.time()
 	start=time.time()
 	modoRead=False
 	escrit=False
@@ -107,17 +107,15 @@ def monitorearProceso(p_USB,p_SMB):
 	while True:
 		print(p_USB.io_counters())
 		time.sleep(1)
+		tie=int(int(time.time()-tiempoMontado)) #Tiempo bruto desde que se ha montado
 		if p_USB.io_counters().write_count==0:
-			tiempoDesdeCero=time.time()
-		if p_USB.io_counters().write_count!=wriAnt_USB and wriAnt_USB>20:
-			start = time.time() #Vamos a coger el tiempo desde la ultima deteccion de cambio de escritura.
+			tiempoDesdeCambio=time.time()
+		if p_USB.io_counters().write_count!=wriAnt_USB and tie>7:
 			print("Escritura detectada")
-			tiempomon=int(tiempoMontado)-int(start)
-			tiempoDesdeCero=time.time()
+			tiempoDesdeCambio=time.time()#Vamos a coger el tiempo desde la ultima deteccion de cambio de escritura.
 			if not modoRead:
 				#Si se da este caso significa que el master esta escribiendo, por lo tanto, SAMBA solo de escritura.
 				cambioSamba(True)
-				aux=p_USB.io_counters().write_count-wriAnt_USB
 				rec=p_USB.io_counters().write_count
 				escrit=True
 				#Primero determinar cuando ha terminado de escribir:
@@ -129,24 +127,18 @@ def monitorearProceso(p_USB,p_SMB):
 				print("Proceso USB: "+p_USB.name())
 		elif escrit is True: #Vamos a mirar si el temporizador lleva mas de x segundos
 			global tiempoEspera
-			print("El tiempo de inicio es: "+str(start)+" tiempo de espera "+str(tiempoEspera))
-			tiem=int(time.time())-int(start)
-			tiem2=int(time.time())-int(tiempoDesdeCero)
-			#if tiem2<tiempoEspera:
-			#	escrit=False
-			#	cambioSamba(False)
-			print("Tiempo entre empezar: "+str(tiem)+" tiempo desde el principio: "+str(tiem2))
-			if tiem>tiempoEspera and tiem2>tiempoEspera: #Ya ha terminado de escribir del todo,y hemos esperado el tiempo, volvemos a poner todo como debe.
+			tiem2=int(time.time())-int(tiempoDesdeCambio)
+			print("Tiempo desde el ultimo cambio: "+str(tiem2))
+			if tiem2>tiempoEspera: #Ya ha terminado de escribir del todo,y hemos esperado el tiempo, volvemos a poner todo como debe.
 				print("Ha entrado aquiiiiiiiiiiiiiiiiiiiiii")
-				#os.system(CMD_UMOUNT)
+				os.system(CMD_UMOUNT)
 				print("Usb desconectado")
-				os.system("sudo umount /mnt/usb_share")
+				os.system("sudo umount -l /mnt/usb_share")
 				print("Desmontaje realizado")
 				os.system("sudo mount /mnt/usb_share")
 				print("Montaje realizado")
-				#os.system(CMD_MOUNT) #Conectamos el USB
 				if p_USB is None:
-					p_USB,p_SMB=buscarProceso()
+					p_USB,p_SMB=buscarProceso(CMD_MOUNT)
 				time.sleep(2)
 				print("Conexion USB realizada")
 				print("Cambio de Samba realizado")
@@ -156,31 +148,36 @@ def monitorearProceso(p_USB,p_SMB):
 		if flag == 1:
 			#Desconectamos y conectamos el USB
 			print("HEMOS DETECTADO UNA MODIFICACION POR SAMBA")
+			time.sleep(2)
 			os.system(CMD_UMOUNT) #Desconectamos el USB
 			print("USB DESMONTADO")
-			os.system(CMD_MOUNT) #Conectamos para que se actualicen los datos. 
+			p_USB,p_SMB=buscarProceso(CMD_MOUNT)
+			tiempoMontado=time.time()
 			print("USB MONTADO")
 			flag=0
 		elif flag == 2:
 			#Se ha creado un nuevo archivo, hay que esperar hasta que se cierra, mientras, USB solo en read.
 			print("HEMOS DETECTADO ESCRITURA POR SAMBA")
+			time.sleep(2)
 			os.system(CMD_UMOUNT) #Desconectamos el USB
 			print("USB desconectado")
-			os.system("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=1 removable=y") 
+			p_USB,p_SMB=buscarProceso("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=1 removable=y")
+			tiempoMontado=time.time()
 			print("USB conectado como solo READ")
 			modoRead=True
 			flag=0
 		elif flag == 3:
 			#Ya se ha cerrado el archivo, por lo que ya podemos volver a conectar con write.
 			os.system(CMD_UMOUNT) #Desconectamos el USB
+			time.sleep(2)
 			print("USB DESMONTADO")
-			os.system(CMD_MOUNT) 
+			p_USB,p_SMB=buscarProceso(CMD_MOUNT)
 			print("USB conectado como READ/WRITE")
 			tiempoMontado=time.time()
 			modoRead=False
 			flag=0
 		if flag!=0:
-			p_USB,p_SMB=buscarProceso()
+			#Ya hemos atendido la señal.
 			flag=0
 		wriAnt_USB=p_USB.io_counters().write_count
 
@@ -189,7 +186,7 @@ if __name__ == "__main__":
 	#Ejecutar el comando para montar.
 	#Primero encontramos el proceso.
 	print("Buscando procesos...")
-	p_USB,p_SMB=buscarProceso()
+	p_USB,p_SMB=buscarProceso(CMD_MOUNT)
 	print("Procesos encontrados!")
 	#os.system(CMD_MOUNT)
 	try:
@@ -201,5 +198,6 @@ if __name__ == "__main__":
 		exit()
 	except Exception as ex:
 		print(ex)
-		p_USB,p_SMB=buscarProceso()
+		print("UY HA CASCADO")
+		p_USB,p_SMB=buscarProceso(CMD_MOUNT)
 		monitorearProceso(p_USB,p_SMB)
