@@ -5,11 +5,19 @@ import os
 import threading
 import pyinotify
 import configparser
+from flask import Flask
+app = Flask(__name__)
+
 
 CMD_MOUNT = "sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y"
-CMD_UMOUNT= "modprobe -r g_mass_storage"
+CMD_UMOUNT= "sudo modprobe -r g_mass_storage"
 tiempoEspera=5
 tiempoMontado=0
+tiempoDespuesEscritura = True
+tiempoPeriodico = True
+tiempoActualizar = 5 # En minutos.
+
+tiempoDesdeCambio=0
 
 flag=0
 
@@ -88,22 +96,63 @@ def buscarProceso(str):
 		if flagSMB is False:
 			os.system("sudo systemctl start smbd")
 
+def actualizarCadaXMinutos():
+	global tiempoActualizar
+	primeravez=True
+	tiempo=tiempoActualizar*60
+	threading.Timer(tiempo,actualizarCadaXMinutos).start()
+	print("Ha pasado el tiempo: "+ str(tiempo))
+	global tiempoDesdeCambio
+	while True:
+		tiempo=int(time.time())-int(tiempoDesdeCambio)
+		print("El tiempo desde la ultima escritura es: "+str(tiempo))
+		if tiempoDesdeCambio==0 or primeravez is True:
+			#No ha habido cambio
+			primeravez=False
+			break
+		if tiempo>10:
+      	# 10 segundos por si las moscas desde la ultima escritura
+			os.system(CMD_UMOUNT)
+			print("Usb desconectado")
+			time.sleep(1)
+			os.system("sudo umount -l /mnt/usb_share")
+			time.sleep(1)
+			print("Desmontaje realizado")
+			os.system("sudo mount /mnt/usb_share")
+			time.sleep(1)
+			os.system(CMD_MOUNT)
+			print("Montaje realizado")
+			time.sleep(2)
+			print("Conexion USB realizada")
+			print("Cambio de Samba realizado")
+			cambioSamba(True)
+			time.sleep(1)
+			break;
+		else:
+			print("Esperamos 7 segundos por la limitacion del tiempo")
+			time.sleep(7) #Esperamos
+		
+        
+    
 
 def monitorearProceso(p_USB,p_SMB):
 	#Deteccion de cambios en samba.
-	x = threading.Thread(target=ControlSamba)
-	x.start()
+	y = threading.Thread(target=ControlSamba)
+	y.start()
 	global flag
 	global tiempoMontado
+	global tiempoDespuesEscritura
+	global tiempoPeriodico
 	#os.system(CMD_MOUNT)
 	tiempoMontado=time.time()
 	tiempoDesdeCamb=time.time()
-	start=time.time()
 	modoRead=False
 	escrit=False
 	wriAnt_USB=p_USB.io_counters().write_count
 	print("Empezamos a monitorear")
-	tiemtotal=0
+	#if tiempoPeriodico is True:
+	#Se va a actulizar cada X tiempo.
+	#actualizarCadaXMinutos()
 	while True:
 		print(p_USB.io_counters())
 		time.sleep(1)
@@ -129,7 +178,7 @@ def monitorearProceso(p_USB,p_SMB):
 			global tiempoEspera
 			tiem2=int(time.time())-int(tiempoDesdeCambio)
 			print("Tiempo desde el ultimo cambio: "+str(tiem2))
-			if tiem2>tiempoEspera: #Ya ha terminado de escribir del todo,y hemos esperado el tiempo, volvemos a poner todo como debe.
+			if tiem2>tiempoEspera and tiempoDespuesEscritura is True: #Ya ha terminado de escribir del todo,y hemos esperado el tiempo (SI SE ELIGE ASI), volvemos a poner todo como debe.
 				print("Ha entrado aquiiiiiiiiiiiiiiiiiiiiii")
 				os.system(CMD_UMOUNT)
 				print("Usb desconectado")
@@ -181,23 +230,33 @@ def monitorearProceso(p_USB,p_SMB):
 			flag=0
 		wriAnt_USB=p_USB.io_counters().write_count
 
-
-if __name__ == "__main__":
-	#Ejecutar el comando para montar.
+    
+def principalThread():
+    #Ejecutar el comando para montar.
 	#Primero encontramos el proceso.
 	print("Buscando procesos...")
 	p_USB,p_SMB=buscarProceso(CMD_MOUNT)
 	print("Procesos encontrados!")
-	#os.system(CMD_MOUNT)
 	try:
 		monitorearProceso(p_USB,p_SMB)
-		#p.io_counter().write_count ## Podemos ver el numero de escrituras que tiene.
-		#time.sleep(1)
+		time.sleep(1)
 	except KeyboardInterrupt:
 		os.system(CMD_UMOUNT)
 		exit()
 	except Exception as ex:
 		print(ex)
 		print("UY HA CASCADO")
-		p_USB,p_SMB=buscarProceso(CMD_MOUNT)
-		monitorearProceso(p_USB,p_SMB)
+		#p_USB,p_SMB=buscarProceso(CMD_MOUNT)
+		#monitorearProceso(p_USB,p_SMB)
+
+##COSAS DE LA INTERFAZ WEB
+@app.route('/inicio')
+def hello_world():
+    return 'Hello, World!'
+
+###############################EL MAIN###############################
+if __name__ == "__main__":
+	x = threading.Thread(target=principalThread)
+	x.start()
+	time.sleep(5)
+	app.run(debug=False,host='0.0.0.0')
