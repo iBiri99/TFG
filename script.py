@@ -12,6 +12,7 @@ app = Flask(__name__)
 CMD_MOUNT = "sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=0 removable=y"
 CMD_UMOUNT= "sudo modprobe -r g_mass_storage"
 tiempoEspera=5
+tiempoEsperaDesdeMontado=30 #En segundos
 tiempoMontado=0
 tiempoDespuesEscritura = True
 tiempoPeriodico = True
@@ -96,9 +97,10 @@ def buscarProceso(str):
 		if flagSMB is False:
 			os.system("sudo systemctl start smbd")
 
+primeravez=True
 def actualizarCadaXMinutos():
 	global tiempoActualizar
-	primeravez=True
+	global primeravez
 	tiempo=tiempoActualizar*60
 	threading.Timer(tiempo,actualizarCadaXMinutos).start()
 	print("Ha pasado el tiempo: "+ str(tiempo))
@@ -106,10 +108,14 @@ def actualizarCadaXMinutos():
 	while True:
 		tiempo=int(time.time())-int(tiempoDesdeCambio)
 		print("El tiempo desde la ultima escritura es: "+str(tiempo))
-		if tiempoDesdeCambio==0 or primeravez is True:
+		print(str(primeravez))
+		if tiempoDesdeCambio==0 and primeravez is True:
 			#No ha habido cambio
 			primeravez=False
+			print("UPS")
 			break
+		print(str(tiempo>10))
+		print("QUE COÑO PASA")
 		if tiempo>10:
       	# 10 segundos por si las moscas desde la ultima escritura
 			os.system(CMD_UMOUNT)
@@ -143,6 +149,9 @@ def monitorearProceso(p_USB,p_SMB):
 	global tiempoMontado
 	global tiempoDespuesEscritura
 	global tiempoPeriodico
+	global tiempoEsperaDesdeMontado
+	global primeravez
+	primeravez=True
 	#os.system(CMD_MOUNT)
 	tiempoMontado=time.time()
 	tiempoDesdeCamb=time.time()
@@ -150,16 +159,17 @@ def monitorearProceso(p_USB,p_SMB):
 	escrit=False
 	wriAnt_USB=p_USB.io_counters().write_count
 	print("Empezamos a monitorear")
-	#if tiempoPeriodico is True:
-	#Se va a actulizar cada X tiempo.
-	#actualizarCadaXMinutos()
+	if tiempoPeriodico is True:
+	    #Se va a actulizar cada X tiempo.
+	    actualizarCadaXMinutos()
 	while True:
 		print(p_USB.io_counters())
 		time.sleep(1)
-		tie=int(int(time.time()-tiempoMontado)) #Tiempo bruto desde que se ha montado
+		tiempoDesdeMontado=int(int(time.time()-tiempoMontado)) #Tiempo bruto desde que se ha montado
 		if p_USB.io_counters().write_count==0:
 			tiempoDesdeCambio=time.time()
-		if p_USB.io_counters().write_count!=wriAnt_USB and tie>7:
+		print("Han pasado: "+str(tiempoDesdeMontado)+"y WriANT: "+str(wriAnt_USB))
+		if p_USB.io_counters().write_count!=wriAnt_USB and tiempoDesdeMontado>tiempoEsperaDesdeMontado:
 			print("Escritura detectada")
 			tiempoDesdeCambio=time.time()#Vamos a coger el tiempo desde la ultima deteccion de cambio de escritura.
 			if not modoRead:
@@ -179,20 +189,21 @@ def monitorearProceso(p_USB,p_SMB):
 			tiem2=int(time.time())-int(tiempoDesdeCambio)
 			print("Tiempo desde el ultimo cambio: "+str(tiem2))
 			if tiem2>tiempoEspera and tiempoDespuesEscritura is True: #Ya ha terminado de escribir del todo,y hemos esperado el tiempo (SI SE ELIGE ASI), volvemos a poner todo como debe.
-				print("Ha entrado aquiiiiiiiiiiiiiiiiiiiiii")
 				os.system(CMD_UMOUNT)
 				print("Usb desconectado")
 				os.system("sudo umount -l /mnt/usb_share")
 				print("Desmontaje realizado")
 				os.system("sudo mount /mnt/usb_share")
 				print("Montaje realizado")
-				if p_USB is None:
-					p_USB,p_SMB=buscarProceso(CMD_MOUNT)
-				time.sleep(2)
-				print("Conexion USB realizada")
 				print("Cambio de Samba realizado")
 				cambioSamba(False)
+				p_USB,p_SMB=buscarProceso(CMD_MOUNT)
+				time.sleep(2)
+				tiempoMontado=time.time()
+				print("Conexion USB realizada")
 				escrit=False
+			elif tiempoDespuesEscritura is False:
+				escrit=False # Para que no siga entrando aqui.
 		#Podemos detectar los cambios de samba con un notificador de deteccion de ficheros. en linux es ionify, pero hay una libreria que hace lo mismo: pionify.
 		if flag == 1:
 			#Desconectamos y conectamos el USB
@@ -245,9 +256,9 @@ def principalThread():
 		exit()
 	except Exception as ex:
 		print(ex)
-		print("UY HA CASCADO")
-		#p_USB,p_SMB=buscarProceso(CMD_MOUNT)
-		#monitorearProceso(p_USB,p_SMB)
+		print("UY HA CASCADO, intentando arreglarlo.")
+		p_USB,p_SMB=buscarProceso(CMD_MOUNT)
+		monitorearProceso(p_USB,p_SMB)
 
 ##COSAS DE LA INTERFAZ WEB
 @app.route('/inicio')
