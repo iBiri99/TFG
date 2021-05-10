@@ -151,6 +151,7 @@ def monitorearProceso(p_USB,p_SMB):
 	global tiempoPeriodico
 	global tiempoEsperaDesdeMontado
 	global primeravez
+	estadoMod=False
 	primeravez=True
 	#os.system(CMD_MOUNT)
 	tiempoMontado=time.time()
@@ -197,6 +198,7 @@ def monitorearProceso(p_USB,p_SMB):
 				print("Montaje realizado")
 				print("Cambio de Samba realizado")
 				cambioSamba(False)
+				os.system("sudo systemctl restart smbd")
 				p_USB,p_SMB=buscarProceso(CMD_MOUNT)
 				time.sleep(2)
 				tiempoMontado=time.time()
@@ -210,24 +212,33 @@ def monitorearProceso(p_USB,p_SMB):
 			print("HEMOS DETECTADO UNA MODIFICACION POR SAMBA")
 			time.sleep(2)
 			os.system(CMD_UMOUNT) #Desconectamos el USB
+			time.sleep(2)
 			print("USB DESMONTADO")
 			p_USB,p_SMB=buscarProceso(CMD_MOUNT)
 			tiempoMontado=time.time()
 			print("USB MONTADO")
+			estadoMod=False
 			flag=0
 		elif flag == 2:
 			#Se ha creado un nuevo archivo, hay que esperar hasta que se cierra, mientras, USB solo en read.
 			print("HEMOS DETECTADO ESCRITURA POR SAMBA")
 			time.sleep(2)
-			os.system(CMD_UMOUNT) #Desconectamos el USB
+			if estadoMod is False:
+				os.system(CMD_UMOUNT) #Desconectamos el USB
+			time.sleep(2)
 			print("USB desconectado")
-			p_USB,p_SMB=buscarProceso("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=1 removable=y")
+			if estadoMod is False:
+				p_USB,p_SMB=buscarProceso("sudo modprobe g_mass_storage file=/piusb.bin stall=0 ro=1 removable=y")
+				estadoMod=True
 			tiempoMontado=time.time()
 			print("USB conectado como solo READ")
 			modoRead=True
 			flag=0
 		elif flag == 3:
 			#Ya se ha cerrado el archivo, por lo que ya podemos volver a conectar con write.
+			print("HEMOS DETECTADO CIERRE DE ARCHIVO")
+			estadoMod=False
+			time.sleep(2)
 			os.system(CMD_UMOUNT) #Desconectamos el USB
 			time.sleep(2)
 			print("USB DESMONTADO")
