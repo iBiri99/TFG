@@ -1,0 +1,39 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    </head>
+    <body>
+	<h1>IP:</h1>
+	<script>
+	function getAllImages() {
+		function siguienteIP(ip) {
+			$.ajax({
+				url: "192.168.0."+ip +":5000/carga",
+				method: 'GET',
+				async: true,
+				success: function(data) {
+					if (data.status == "success" || ip>254) {
+						//renderImageData(data);
+						console.log("ENCONTRADO");
+					}else{
+						ip++;
+						console.log("NO HA SIDO ENCONTRADO");
+						siguienteIP(ip);
+
+					}
+				}
+			});
+		}
+		ip=1;
+		siguienteIP(ip);
+	}
+
+	// no while loop is needed
+	// just call getAllImages() and pass it the 
+	// position and the maxImages you want to retrieve
+	getAllImages();
+	</script>
+    </body>
+</html>
