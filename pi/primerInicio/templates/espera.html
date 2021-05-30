@@ -1,0 +1,39 @@
+<form>
+	<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+	<h1>Se estan aplicando las configuraciones necesarias, espera</h1>
+	<img src="/static/load.gif">
+	<div id="estado"></div>    
+</form>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script type="text/javascript">
+	$(document).ready(function() {
+	    setInterval(ajaxd, 1000);
+	});
+
+	function ajaxd() { 
+	let tabla = document.getElementById("estado");
+	var csrf_token = "{{ csrf_token() }}";
+	$.ajax({
+            url:"/ajax",
+            type:"POST",
+	    headers: {"X-CSRFToken" : csrf_token},
+            success: function(response){
+                tabla.innerHTML ="El estado actual es: "+ response;
+		if(response==3){
+			window.location.replace("{{url_for('parametros')}}");
+		}
+
+            },
+            error: function(error){
+            //console.log(error);
+            },
+        });
+
+
+
+
+
+
+
+	}
+</script>

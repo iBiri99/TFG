@@ -1,0 +1,26 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    </head>
+    <body>
+        <form action='/configuracionDireccion' method="POST">
+                {{ form.csrf_token() }}
+                <h2>¿En que modo quieres que funcione?.</h2>
+                <input type="radio" id="S" name="modo" value="S" required>
+                <label for="S">Automatico o bidireccional.</label><br>
+                <input type="radio" id="N" name="modo" value="N" required>
+                <label for="N">Unidireccional. Escritura solo por Samba.</label><br>
+                <input type="radio" id="O" name="modo" value="O" required>
+                <label for="N">Unidireccional. Escritura solo por USB</label><br>
+                <h2>¿Cuanto tiempo quieres que tarde en propagar el cambio?.</h2>
+                {{form.propagar()}}
+                <h2>¿Cuanto tiempo quieres que espere despues de la primera conexion antes de aceptar cambios?.</h2>
+                {{form.inicio()}}
+		<h2> Cada cuanto quieres que se actualice periodicamente? (0=no se actualiza)</h2>
+		{{form.actualizar()}}
+                <button type="submit">Conectar!</input>
+        </form>
+    </body>
+</html>

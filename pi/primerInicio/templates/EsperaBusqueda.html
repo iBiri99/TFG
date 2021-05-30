@@ -1,0 +1,37 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    </head>
+    <body>
+	<h1>Buscando la el dispositivo iUSB</h1>
+	<script>
+	function probar(ip){
+		var url = 'http://192.168.0.'+ip+":5000/carga";
+		var img = new Image();
+		img.src = url;
+		img.onload = function() {
+			alert('Se ha encontrado el iUSB en la direccion: 192.168.0.'+ip);
+			window.location.replace("http://192.168.0."+ip+":5000/wifi_cogido");
+			return 1;
+		}
+		img.onerror = function() {
+			console.log(ip);
+			return 0;
+		}
+	}
+	
+	//Esperamos un poco antes de empezar
+	console.log("Espera antes de empezar cada 20 segundos");
+	var refreshIntervalId = setInterval(function(){
+		ip=1;
+		console.log("Empezamos");
+		while(ip<252){
+			probar(ip++);
+		}
+	}, 20000);
+
+	</script>
+    </body>
+</html>
