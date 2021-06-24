@@ -1,9 +1,29 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+	<style>
+	.estilo {
+		text-align: center;
+		color:white;
+	}
+	.center {
+		display: block;
+		margin-left: auto;
+		margin-right: auto;
+		width: 5%;
+	}
+
+        </style>
+
+</head>
+<body style="background-color: #2eae8b;">
 <form>
 	<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-	<h1>Se estan aplicando las configuraciones necesarias, espera</h1>
-	<img src="/static/load.gif">
-	<div id="estado"></div>    
+	<h1 class="estilo">Se estan aplicando las configuraciones necesarias, espera...</h1>
+	<img src="/static/carga.gif" class="center">
+	<div id="estado" class="estilo"></div>    
 </form>
+</body>
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 <script type="text/javascript">
 	$(document).ready(function() {
@@ -19,7 +39,7 @@
 	    headers: {"X-CSRFToken" : csrf_token},
             success: function(response){
                 tabla.innerHTML ="El estado actual es: "+ response;
-		if(response==3){
+		if(response>3){
 			window.location.replace("{{url_for('parametros')}}");
 		}
 
@@ -37,3 +57,4 @@
 
 	}
 </script>
+</html>

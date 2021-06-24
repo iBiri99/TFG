@@ -3,17 +3,32 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        .estilo {
+                text-align: center;
+                color:white;
+        }
+	.center {
+		display: block;
+		margin-left: auto;
+		margin-right: auto;
+		width: 5%;
+	}
+    </style>
+
     </head>
-    <body>
-	<h1>Buscando la el dispositivo iUSB</h1>
+    <body style="background-color: #2eae8b;">
+	<h1 class="estilo">Buscando el dispositivo iUSB</h1>
+	<br>
+ 	<img src="/static/carga.gif" class="center">
 	<script>
 	function probar(ip){
-		var url = 'http://192.168.0.'+ip+":5000/carga";
+		var url = 'http://192.168.43.'+ip+":5000/carga";
 		var img = new Image();
 		img.src = url;
 		img.onload = function() {
-			alert('Se ha encontrado el iUSB en la direccion: 192.168.0.'+ip);
-			window.location.replace("http://192.168.0."+ip+":5000/wifi_cogido");
+			alert('Se ha encontrado el iUSB en la direccion: 192.168.43.'+ip);
+			window.location.replace("http://192.168.43."+ip+":5000/wifi_cogido");
 			return 1;
 		}
 		img.onerror = function() {

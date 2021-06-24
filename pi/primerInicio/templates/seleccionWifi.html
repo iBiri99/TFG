@@ -3,18 +3,26 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        .estilo {
+                color:white;
+        }
+        .text-center {
+                text-align: center;
+        }
+    </style>
     </head>
-    <body>
+    <body style="background-color: #2eae8b;">
 	<form action='/wifi' method="POST">
 		{{ form.csrf_token() }}
-		<h2>Hemos encontrado las siguientes redes inalambricas.</h2>
+		<h2  class="estilo">Hemos encontrado las siguientes redes inalambricas.</h2>
 		{% for ssid in wifis%}
-		<input type="radio" id="{{ssid}}" name="wifi" value="{{ssid}}" required>
-		<label for="{{ssid}}">{{ssid}}</label><br>
+		<input type="radio" id="{{ssid}}" name="wifi" value="{{ssid}}"required>
+		<label for="{{ssid}}" class="estilo">{{ssid}}</label><br>
 		{% endfor %}
-		<h3>Si no sale la que buscas, prueba recargando la página</h3>
-		{{form.password()}}
-		<button type="submit">Conectar!</input>
+		<h3 class="estilo">Si no sale la red que buscas, prueba recargando la página</h3>
+		<h4 class="estilo">Password: </h4> {{form.password()}}
+		<button type="submit" style="text-align: center;"">Conectar!</input>
 	</form>
     </body>
 </html>

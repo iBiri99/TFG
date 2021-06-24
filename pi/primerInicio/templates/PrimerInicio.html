@@ -3,12 +3,24 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+   <style>
+	.estilo {
+		text-align: center;
+		color:white;
+	}
+	.text-center {
+		text-align: center;
+	}
+   </style>
+
     </head>
-    <body>
+    <body style="background-color: #2eae8b;">
 	<form action="{{url_for('wifi')}}" method="GET">
-		<h1>Bienvenido a la configuración de iUSB:</h1>
-		<h2>Primero tendremos que conectarnos a un Wi-fi</h2>
-		<button type="submit">Vamos a ello!</input>
+		<h1 class="estilo">Bienvenido a la configuración de iUSB:</h1>
+		<h2 class="estilo">Primero tendremos que conectarnos a un Wi-fi</h2>
+		<div class="text-center">
+			<button type="submit">Vamos a ello!</input>
+		</div>
 	</form>
     </body>
 </html>
